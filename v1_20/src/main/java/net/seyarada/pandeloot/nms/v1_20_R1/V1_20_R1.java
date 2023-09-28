@@ -7,10 +7,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import net.minecraft.advancements.*;
 import net.minecraft.advancements.critereon.SerializationContext;
+import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.*;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,8 +30,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,15 +44,13 @@ public class V1_20_R1 implements NMSMethods {
         double lY = location.getY() + 1.2;
         double lZ = location.getZ();
 
-
-
         List<Display.TextDisplay> holograms = new ArrayList<>();
 
         Collections.reverse(text);
 
         for (String msg : text) {
-            if(msg == null) continue;
-            if(msg.isEmpty()) {
+            if (msg == null) continue;
+            if (msg.isEmpty()) {
                 lY += 0.22;
                 holograms.add(null);
                 continue;
@@ -63,18 +61,26 @@ public class V1_20_R1 implements NMSMethods {
             displayEntity.setPos(lX, lY, lZ);
             displayEntity.setCustomName(Component.literal(msg));
             displayEntity.setCustomNameVisible(true);
-            displayEntity.setInterpolationDuration(20);
-            displayEntity.setInterpolationDelay(0);
+            displayEntity.setTextOpacity((byte) 1);
+
+            try {
+                Method durMethod = Display.TextDisplay.class.getDeclaredMethod("b", int.class); //setInterpolationDuration
+                durMethod.setAccessible(true);
+                durMethod.invoke(displayEntity, 20);
+                // Interpolation Delay is already 0 by default
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             holograms.add(displayEntity);
             int id = displayEntity.getId();
             ClientboundAddEntityPacket packetPlayOutSpawnEntity = new ClientboundAddEntityPacket(displayEntity, 1);
             ClientboundSetEntityDataPacket metadata = new ClientboundSetEntityDataPacket(id, displayEntity.getEntityData().packDirty());
 
-            final ServerGamePacketListenerImpl connection = ((CraftPlayer) player).getHandle().connection;
+            final Connection connection = getConnectionWithReflection(player);
             connection.send(packetPlayOutSpawnEntity);
             connection.send(metadata);
 
-            if(duration>0) {
+            if (duration > 0) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (player.isOnline()) {
                         ClientboundRemoveEntitiesPacket destroy = new ClientboundRemoveEntitiesPacket(id);

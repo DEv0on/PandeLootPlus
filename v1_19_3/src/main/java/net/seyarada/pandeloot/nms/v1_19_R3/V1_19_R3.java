@@ -145,7 +145,7 @@ public class V1_19_R3 implements NMSMethods {
 
         ChannelPipeline pipeline = getConnectionWithReflection(player).channel.pipeline();
         for (String name : pipeline.toMap().keySet()) {
-            if (pipeline.get(name) instanceof net.minecraft.network.Connection) {
+            if (pipeline.get(name) instanceof net.minecraft.network.PacketBundleUnpacker) {
                 pipeline.addBefore(name, "pande_loot_packet_handler", cdh);
                 break;
             }
